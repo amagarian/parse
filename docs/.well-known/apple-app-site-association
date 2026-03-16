@@ -1,0 +1,22 @@
+{
+  "appclips": {
+    "apps": [
+      "NF6D29P3HJ.com.aidenmagarian.parse.Clip"
+    ]
+  },
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "NF6D29P3HJ.com.aidenmagarian.parse",
+          "NF6D29P3HJ.com.aidenmagarian.parse.Clip"
+        ],
+        "components": [
+          {
+            "/": "/parse/s*"
+          }
+        ]
+      }
+    ]
+  }
+}

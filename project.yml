@@ -5,6 +5,11 @@ options:
     iOS: "17.0"
   xcodeVersion: "15.0"
 
+packages:
+  FirebaseSDK:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.0.0"
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -18,7 +23,8 @@ targets:
     sources:
       - Parse
     dependencies:
-      - target: ParseClip
+      - package: FirebaseSDK
+        product: FirebaseFirestore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.amagarian.parse
@@ -42,48 +48,3 @@ targets:
         NSPhotoLibraryUsageDescription: "Parse needs photo library access to select receipt photos."
         LSApplicationQueriesSchemes:
           - venmo
-    entitlements:
-      path: Parse/Parse.entitlements
-      properties:
-        com.apple.developer.associated-domains:
-          - "appclips:amagarian.github.io"
-
-  ParseClip:
-    type: application.on-demand-install-capable
-    platform: iOS
-    sources:
-      - path: ParseClip
-      - path: Parse/Models
-      - path: Parse/Services/QRCodeService.swift
-      - path: Parse/Extensions
-      - path: Parse/Views/ParseMark.swift
-      - path: Parse/Views/ItemSelectionView.swift
-      - path: Parse/Views/PaymentSummaryView.swift
-      - path: Parse/Views/SummaryRow.swift
-      - path: Parse/Assets.xcassets
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.amagarian.parse.Clip
-        DEVELOPMENT_TEAM: "NF6D29P3HJ"
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        TARGETED_DEVICE_FAMILY: "1,2"
-        SWIFT_EMIT_LOC_STRINGS: "YES"
-    info:
-      path: ParseClip/Info.plist
-      properties:
-        UILaunchScreen: {}
-        UIRequiresFullScreen: true
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-        CFBundleDisplayName: Parse
-        CFBundleIconName: AppIcon
-        CFBundlePackageType: APPL
-        NSCameraUsageDescription: "Parse needs camera access to scan QR codes."
-    entitlements:
-      path: ParseClip/ParseClip.entitlements
-      properties:
-        com.apple.developer.associated-domains:
-          - "appclips:amagarian.github.io"
-        com.apple.developer.parent-application-identifiers:
-          - "$(AppIdentifierPrefix)com.amagarian.parse"

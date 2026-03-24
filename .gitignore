@@ -22,3 +22,7 @@ xcuserdata/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Firebase — never commit these
+GoogleService-Info.plist
+"GoogleService-Info 2.plist"

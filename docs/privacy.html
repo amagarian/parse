@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy – Parse</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f7f7f9;
+            color: #1f1f24;
+            padding: 40px 20px;
+            max-width: 680px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+        h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        .meta { color: #73737a; font-size: 14px; margin-bottom: 36px; }
+        h2 { font-size: 18px; font-weight: 600; margin: 28px 0 10px; }
+        p { font-size: 15px; color: #3a3a42; margin-bottom: 12px; }
+        ul { padding-left: 20px; margin-bottom: 12px; }
+        li { font-size: 15px; color: #3a3a42; margin-bottom: 6px; }
+        a { color: #f55940; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Parse – Split the Bill &nbsp;·&nbsp; Last updated: March 2026</p>
+
+    <p>Parse is a bill-splitting app that helps groups of people divide a restaurant check. We take your privacy seriously and have designed the app to collect as little data as possible.</p>
+
+    <h2>Data We Do Not Collect</h2>
+    <p>Parse does not collect, store, or share any data that is linked or linkable to your identity. Specifically, we do not collect:</p>
+    <ul>
+        <li>Names, email addresses, or phone numbers</li>
+        <li>Location data</li>
+        <li>Payment or financial information</li>
+        <li>Photos or images</li>
+        <li>Usage analytics or crash reports tied to individuals</li>
+    </ul>
+
+    <h2>Camera Access</h2>
+    <p>Parse requests access to your device's camera solely to photograph restaurant receipts. All image processing (OCR text recognition) is performed entirely on-device using Apple's Vision framework. Receipt images are never uploaded to any server.</p>
+
+    <h2>Session Data (Real-Time Sync)</h2>
+    <p>When a host creates a bill-splitting session, a temporary session document is written to Google Firebase Firestore. This document contains:</p>
+    <ul>
+        <li>The restaurant name from the receipt</li>
+        <li>Itemized prices (no personal financial data)</li>
+        <li>First-name or nickname entered voluntarily by participants</li>
+        <li>Which items each participant claimed</li>
+    </ul>
+    <p>This data is not linked to any account or persistent identity. Sessions are ephemeral and intended only to facilitate real-time coordination between diners. We do not use this data for any other purpose.</p>
+
+    <h2>Third-Party Services</h2>
+    <ul>
+        <li><strong>Firebase (Google):</strong> Used for real-time session sync. Google's privacy policy applies: <a href="https://policies.google.com/privacy" target="_blank">policies.google.com/privacy</a></li>
+        <li><strong>Venmo:</strong> Payment requests are initiated via Venmo's deep link. Parse does not handle any payment information. Venmo's privacy policy applies: <a href="https://venmo.com/legal/us-privacy-policy/" target="_blank">venmo.com/legal/us-privacy-policy</a></li>
+    </ul>
+
+    <h2>Data Retention</h2>
+    <p>Session data in Firebase is temporary and not actively retained. We do not maintain databases of user activity or sessions.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>Parse is not directed at children under 13 and does not knowingly collect information from children.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this privacy policy? Reach out at <a href="mailto:aiden@amagarian.com">aiden@amagarian.com</a></p>
+</body>
+</html>

@@ -3,7 +3,7 @@ import CoreImage.CIFilterBuiltins
 import UIKit
 
 class QRCodeService {
-    static let webBaseURL = "https://useparse.app"
+    static let webBaseURL = "https://amagarian.github.io/parse"
 
     // MARK: - Generate
 

@@ -25,9 +25,11 @@ class ReceiptParser {
         ("grand.?total", .total),
         ("total.?due", .total),
         ("amount.?due", .total),
+        ("net.?total", .subtotal),
         ("^total", .total),
         ("^amt\\b", .total),
         ("^amount\\b", .total),
+        ("balance.?due", .total),
         // Surcharges / flat fees split evenly among all diners
         ("surcharge", .fees),
         ("processing.?fee", .fees),
@@ -102,6 +104,39 @@ class ReceiptParser {
                 debugLog.append((line: trimmed, verdict: "ITEM: \(name) $\(price) qty\(quantity)"))
             } else {
                 debugLog.append((line: trimmed, verdict: "skip: bad name '\(name)' or price \(price)"))
+            }
+        }
+
+        // Cross-check: determine a reference subtotal from a detected summary line
+        // or derive one from total − tax − tip − fees.
+        var referenceSubtotal = subtotal
+        if referenceSubtotal == nil, let t = total {
+            let derived = t - (tax ?? 0) - (tip ?? 0) - (fees ?? 0)
+            if derived > 0 { referenceSubtotal = derived }
+        }
+
+        // If items sum significantly exceeds the reference, receipt category
+        // subtotals (e.g. "Food", "Beverage") were likely parsed as items.
+        // Remove items from the bottom up — categories always appear after the
+        // individual items — until the sum matches.
+        if let ref = referenceSubtotal, !items.isEmpty {
+            let itemSum = items.reduce(0.0) { $0 + $1.price }
+            var excess = itemSum - ref
+            if excess > 0.50 {
+                var toRemove: [Int] = []
+                for i in stride(from: items.count - 1, through: 0, by: -1) {
+                    guard excess > 0.01 else { break }
+                    if items[i].price <= excess + 0.01 {
+                        toRemove.append(i)
+                        excess -= items[i].price
+                    }
+                }
+                if abs(excess) < 0.50 {
+                    for i in toRemove.sorted().reversed() {
+                        debugLog.append((line: items[i].name, verdict: "pruned: category subtotal"))
+                        items.remove(at: i)
+                    }
+                }
             }
         }
 

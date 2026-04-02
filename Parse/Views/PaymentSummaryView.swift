@@ -74,7 +74,11 @@ struct PaymentSummaryView: View {
                                     .tracking(0.4)
                                     .foregroundColor(Color.theme.accentSecondary)
 
-                                if item.claimedBy.count > 1 {
+                                if let split = item.splitOverrides[userName] {
+                                    Text("1/\(split)")
+                                        .font(.system(size: 8, weight: .light))
+                                        .foregroundColor(Color.theme.textSecondary)
+                                } else if item.claimedBy.count > 1 {
                                     Text("÷\(item.claimedBy.count)")
                                         .font(.system(size: 8, weight: .light))
                                         .foregroundColor(Color.theme.textSecondary)
@@ -82,7 +86,7 @@ struct PaymentSummaryView: View {
 
                                 Spacer()
 
-                                Text(String(format: "$%.2f", item.pricePerClaimant))
+                                Text(String(format: "$%.2f", item.priceForPerson(userName)))
                                     .font(.system(size: 10, weight: .light, design: .monospaced))
                                     .tracking(0.5)
                                     .foregroundColor(Color.theme.accentSecondary)
@@ -100,12 +104,16 @@ struct PaymentSummaryView: View {
                             }
                         }
 
-                        // Subtotal / Tax / Tip rows
+                        // Subtotal / Tax / Fees / Tip rows
                         Group {
                             splitRow(label: "Items subtotal",
                                      value: String(format: "$%.2f", itemsSubtotal))
                             splitRow(label: "Tax (\(String(format: "%.1f%%", session.taxRate * 100)))",
                                      value: String(format: "$%.2f", proportionalTax))
+                            if session.fees > 0 {
+                                splitRow(label: "Fees (\(String(format: "%.1f%%", session.feesRate * 100)))",
+                                         value: String(format: "$%.2f", proportionalFees))
+                            }
                             splitRow(label: "Tip (\(String(format: "%.1f%%", session.tipRate * 100)))",
                                      value: String(format: "$%.2f", proportionalTip))
                         }
@@ -209,11 +217,12 @@ struct PaymentSummaryView: View {
     }
 
     private var itemsSubtotal: Double {
-        userItems.reduce(0) { $0 + $1.pricePerClaimant }
+        userItems.reduce(0) { $0 + $1.priceForPerson(userName) }
     }
 
-    private var proportionalTax: Double { itemsSubtotal * session.taxRate }
-    private var proportionalTip: Double { itemsSubtotal * session.tipRate }
+    private var proportionalTax: Double  { itemsSubtotal * session.taxRate }
+    private var proportionalFees: Double { itemsSubtotal * session.feesRate }
+    private var proportionalTip: Double  { itemsSubtotal * session.tipRate }
     private var totalOwed: Double { session.totalForPerson(userName) }
     private var formattedTotal: String { String(format: "$%.2f", totalOwed) }
 

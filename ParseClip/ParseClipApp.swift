@@ -1,8 +1,16 @@
 import SwiftUI
+import FirebaseCore
 
 @main
 struct ParseClipApp: App {
     @State private var session: SplitSession?
+
+    init() {
+        if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+           let options = FirebaseOptions(contentsOfFile: path) {
+            FirebaseApp.configure(options: options)
+        }
+    }
 
     var body: some Scene {
         WindowGroup {

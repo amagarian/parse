@@ -2,12 +2,15 @@ import SwiftUI
 
 struct ReceiptEditView: View {
     @Binding var session: SplitSession
+    var debugLines: [String] = []
+    var debugParserLog: [(line: String, verdict: String)] = []
     @Environment(\.dismiss) private var dismiss
     @State private var editingItemId: UUID?
     @State private var newItemName = ""
     @State private var newItemPrice = ""
     @State private var isAddingItem = false
     @State private var navigateToHostSetup = false
+    @State private var showDebug = false
 
     private var today: String {
         let f = DateFormatter()
@@ -30,6 +33,16 @@ struct ReceiptEditView: View {
                             .foregroundColor(Color.theme.textSecondary)
                     }
                     Spacer()
+                    if !debugLines.isEmpty {
+                        Button { withAnimation { showDebug.toggle() } } label: {
+                            Text(showDebug ? "Hide Raw" : "Raw Scan")
+                                .font(.system(size: 9, weight: .light))
+                                .tracking(1.5)
+                                .textCase(.uppercase)
+                                .foregroundColor(showDebug ? Color.theme.accent : Color.theme.textSecondary)
+                        }
+                        .padding(.trailing, 12)
+                    }
                     Button {
                         withAnimation { isAddingItem = true }
                     } label: {
@@ -70,6 +83,62 @@ struct ReceiptEditView: View {
                         .padding(.horizontal, 22)
                         .padding(.bottom, 16)
 
+                        // Debug panel
+                        if showDebug && (!debugLines.isEmpty || !debugParserLog.isEmpty) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                // Raw OCR
+                                if !debugLines.isEmpty {
+                                    Text("Raw OCR — \(debugLines.count) lines")
+                                        .font(.system(size: 7, weight: .light))
+                                        .tracking(1.5)
+                                        .textCase(.uppercase)
+                                        .foregroundColor(Color.theme.accent)
+                                        .padding(.horizontal, 22)
+                                        .padding(.top, 10)
+                                        .padding(.bottom, 4)
+                                    ForEach(Array(debugLines.enumerated()), id: \.offset) { i, line in
+                                        Text("\(i + 1): \(line)")
+                                            .font(.system(size: 9, weight: .light, design: .monospaced))
+                                            .foregroundColor(Color.theme.textSecondary)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 22)
+                                            .padding(.vertical, 2)
+                                    }
+                                }
+                                // Parser decisions
+                                if !debugParserLog.isEmpty {
+                                    Text("Parser decisions")
+                                        .font(.system(size: 7, weight: .light))
+                                        .tracking(1.5)
+                                        .textCase(.uppercase)
+                                        .foregroundColor(Color.theme.accent)
+                                        .padding(.horizontal, 22)
+                                        .padding(.top, 14)
+                                        .padding(.bottom, 4)
+                                    ForEach(Array(debugParserLog.enumerated()), id: \.offset) { i, entry in
+                                        HStack(alignment: .top, spacing: 6) {
+                                            Text(entry.verdict.hasPrefix("ITEM") ? "✓" : "✗")
+                                                .font(.system(size: 9, design: .monospaced))
+                                                .foregroundColor(entry.verdict.hasPrefix("ITEM") ? Color.green : Color.red.opacity(0.7))
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text(entry.line)
+                                                    .font(.system(size: 8, weight: .light, design: .monospaced))
+                                                    .foregroundColor(Color.theme.textSecondary)
+                                                Text(entry.verdict)
+                                                    .font(.system(size: 8, weight: .light, design: .monospaced))
+                                                    .foregroundColor(entry.verdict.hasPrefix("ITEM") ? Color.green.opacity(0.8) : Color.orange.opacity(0.8))
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 22)
+                                        .padding(.vertical, 2)
+                                    }
+                                }
+                            }
+                            .padding(.bottom, 12)
+                            .background(Color.theme.cardBackground.opacity(0.6))
+                        }
+
                         // Item list
                         ForEach(Array(session.items.enumerated()), id: \.element.id) { index, item in
                             itemRow(item: item, index: index)
@@ -92,6 +161,34 @@ struct ReceiptEditView: View {
                                     .foregroundColor(Color.theme.textSecondary)
                                 Spacer()
                                 TextField("0.00", value: $session.tax, format: .currency(code: "USD"))
+                                    .multilineTextAlignment(.trailing)
+                                    .keyboardType(.decimalPad)
+                                    .font(.system(size: 9, weight: .light, design: .monospaced))
+                                    .tracking(0.5)
+                                    .foregroundColor(Color.theme.accentSecondary)
+                                    .frame(width: 80)
+                            }
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 8)
+                            .overlay(alignment: .bottom) {
+                                Rectangle().fill(Color.theme.rule).frame(height: 1)
+                                    .padding(.horizontal, 22)
+                            }
+
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Fees")
+                                        .font(.system(size: 9, weight: .light))
+                                        .tracking(1)
+                                        .textCase(.uppercase)
+                                        .foregroundColor(Color.theme.textSecondary)
+                                    Text("surcharges · split evenly")
+                                        .font(.system(size: 7, weight: .light))
+                                        .tracking(0.5)
+                                        .foregroundColor(Color.theme.textSecondary.opacity(0.6))
+                                }
+                                Spacer()
+                                TextField("0.00", value: $session.fees, format: .currency(code: "USD"))
                                     .multilineTextAlignment(.trailing)
                                     .keyboardType(.decimalPad)
                                     .font(.system(size: 9, weight: .light, design: .monospaced))
@@ -147,14 +244,6 @@ struct ReceiptEditView: View {
                     }
                 }
 
-                // Primary CTA
-                NavigationLink(isActive: $navigateToHostSetup) {
-                    HostSetupView(session: $session)
-                } label: {
-                    EmptyView()
-                }
-                .hidden()
-
                 Button {
                     navigateToHostSetup = true
                 } label: {
@@ -173,6 +262,9 @@ struct ReceiptEditView: View {
             }
         }
         .navigationBarHidden(true)
+        .navigationDestination(isPresented: $navigateToHostSetup) {
+            HostSetupView(session: $session)
+        }
     }
 
     // MARK: — Item Row
@@ -350,4 +442,6 @@ struct ReceiptEditView: View {
     private func recalcSubtotal() {
         session.subtotal = session.items.reduce(0) { $0 + $1.price }
     }
+    // Note: session.fees is intentionally excluded from the subtotal — it is
+    // tracked separately and divided proportionally, not included in the items sum.
 }

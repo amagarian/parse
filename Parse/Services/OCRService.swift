@@ -55,7 +55,10 @@ class OCRService {
         guard !blocks.isEmpty else { return [] }
 
         let avgHeight = blocks.reduce(0.0) { $0 + $1.boundingBox.height } / CGFloat(blocks.count)
-        let lineThreshold = max(avgHeight * 0.5, 0.005)
+        // Use 0.65× average glyph height — wide enough to group item name + price
+        // columns that Vision places on slightly different baselines, while still
+        // keeping adjacent receipt rows separate.
+        let lineThreshold = max(avgHeight * 0.65, 0.007)
 
         let sorted = blocks.sorted { $0.boundingBox.midY > $1.boundingBox.midY }
 

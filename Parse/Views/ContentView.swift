@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var ocrError: String?
     @State private var showCamera = false
     @State private var navigateToEdit = false
+    @State private var debugRawLines: [String] = []
+    @State private var debugParserLog: [(line: String, verdict: String)] = []
     @State private var navigateToItemSelection = false
     @State private var showScanner = false
     @State private var scannedSession: SplitSession?
@@ -17,7 +19,7 @@ struct ContentView: View {
             homeView
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(isPresented: $navigateToEdit) {
-                    ReceiptEditView(session: $session)
+                    ReceiptEditView(session: $session, debugLines: debugRawLines, debugParserLog: debugParserLog)
                 }
                 .navigationDestination(isPresented: $navigateToItemSelection) {
                     if let scanned = scannedSession {
@@ -191,11 +193,14 @@ struct ContentView: View {
             isProcessing = false
             switch result {
             case .success(let lines):
+                debugRawLines = lines
                 let parsed = ReceiptParser.parse(lines: lines)
+                debugParserLog = parsed.debugLog
                 session.items = parsed.items
                 session.subtotal = parsed.subtotal ?? parsed.items.reduce(0) { $0 + $1.price }
                 session.tax = parsed.tax ?? 0
                 session.tip = parsed.tip ?? 0
+                session.fees = parsed.fees ?? 0
                 session.restaurantName = parsed.restaurantName ?? ""
 
                 if session.items.isEmpty {

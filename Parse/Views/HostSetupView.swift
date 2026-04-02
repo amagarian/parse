@@ -4,6 +4,8 @@ struct HostSetupView: View {
     @Binding var session: SplitSession
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToShare = false
+    @AppStorage("savedHostName") private var savedHostName = ""
+    @AppStorage("savedVenmoUsername") private var savedVenmoUsername = ""
 
     var body: some View {
         ZStack {
@@ -105,13 +107,6 @@ struct HostSetupView: View {
                     }
                 }
 
-                NavigationLink(isActive: $navigateToShare) {
-                    ShareSessionView(session: session)
-                } label: {
-                    EmptyView()
-                }
-                .hidden()
-
                 Button { navigateToShare = true } label: {
                     Text("Generate QR Code")
                         .font(.system(size: 11, weight: .light, design: .monospaced))
@@ -128,6 +123,15 @@ struct HostSetupView: View {
             }
         }
         .navigationBarHidden(true)
+        .navigationDestination(isPresented: $navigateToShare) {
+            ShareSessionView(session: session)
+        }
+        .onAppear {
+            if session.hostName.isEmpty { session.hostName = savedHostName }
+            if session.venmoUsername.isEmpty { session.venmoUsername = savedVenmoUsername }
+        }
+        .onChange(of: session.hostName) { _, new in savedHostName = new }
+        .onChange(of: session.venmoUsername) { _, new in savedVenmoUsername = new }
     }
 
     // MARK: — Field Row

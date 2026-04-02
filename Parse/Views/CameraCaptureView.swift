@@ -43,25 +43,11 @@ struct CameraCaptureView: View {
                     .padding(.horizontal, 22)
                     .padding(.bottom, 16)
 
-                // Viewfinder
+                Spacer()
+
+                // Viewfinder — vertically centered between header and buttons
                 viewfinderArea
                     .padding(.horizontal, 22)
-
-                // Tip
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(Color.theme.textSecondary)
-                        .frame(width: 4, height: 4)
-                        .padding(.top, 5)
-                    Text("Ensure the full receipt is visible within the frame. Works best in good lighting.")
-                        .font(.system(size: 9, weight: .light))
-                        .tracking(0.5)
-                        .foregroundColor(Color.theme.textSecondary)
-                        .lineSpacing(3)
-                }
-                .padding(.horizontal, 22)
-                .padding(.top, 14)
-                .padding(.bottom, 20)
 
                 Spacer()
 
@@ -140,34 +126,16 @@ struct CameraCaptureView: View {
 
     private var viewfinderArea: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.theme.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.theme.rule, lineWidth: 1)
-                )
-
-            // Ambient glow
-            RadialGradient(
-                colors: [Color.theme.accent.opacity(0.05), .clear],
-                center: .center, startRadius: 0, endRadius: 120
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-
-            // Corner brackets
+            // Corner brackets only — open frame, no card fill
             GeometryReader { geo in
-                let m: CGFloat = 20
-                let len: CGFloat = 18
-                let t: CGFloat = 1
+                let m: CGFloat = 24
+                let len: CGFloat = 22
+                let t: CGFloat = 1.2
 
                 Group {
-                    // TL
                     cornerBracket(x: m, y: m, len: len, t: t, flipH: false, flipV: false)
-                    // TR
                     cornerBracket(x: geo.size.width - m, y: m, len: len, t: t, flipH: true, flipV: false)
-                    // BL
                     cornerBracket(x: m, y: geo.size.height - m, len: len, t: t, flipH: false, flipV: true)
-                    // BR
                     cornerBracket(x: geo.size.width - m, y: geo.size.height - m, len: len, t: t, flipH: true, flipV: true)
                 }
             }
@@ -175,18 +143,15 @@ struct CameraCaptureView: View {
             // Animated scan line
             ScanLine()
 
-            VStack(spacing: 10) {
-                Text("🧾")
-                    .font(.system(size: 28))
-                    .opacity(0.45)
-                Text("Point at receipt")
-                    .font(.system(size: 8, weight: .light))
-                    .tracking(2)
-                    .textCase(.uppercase)
-                    .foregroundColor(Color.theme.textSecondary)
-            }
+            // Label — centered inside the frame
+            Text("Tap below to scan")
+                .font(.system(size: 8, weight: .light))
+                .tracking(2.5)
+                .textCase(.uppercase)
+                .foregroundColor(Color.theme.textSecondary.opacity(0.5))
         }
-        .frame(height: 280)
+        .frame(maxWidth: .infinity)
+        .aspectRatio(3/4, contentMode: .fit)
     }
 
     private func cornerBracket(x: CGFloat, y: CGFloat, len: CGFloat, t: CGFloat, flipH: Bool, flipV: Bool) -> some View {
@@ -221,30 +186,28 @@ struct CameraCaptureView: View {
 // MARK: — Scan Line Animation
 
 private struct ScanLine: View {
-    @State private var offset: CGFloat = 0
+    /// Must match the bracket margin in viewfinderArea so the line stays inside the frame.
+    private let inset: CGFloat = 24
+    @State private var atBottom = false
 
     var body: some View {
         GeometryReader { geo in
-            let h = geo.size.height
+            let travel = geo.size.height - inset * 2
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [.clear, Color.theme.accentSecondary, .clear],
+                        colors: [.clear, Color.theme.accentSecondary.opacity(0.8), .clear],
                         startPoint: .leading, endPoint: .trailing
                     )
                 )
                 .frame(height: 1)
-                .opacity(0.7)
-                .offset(y: offset)
+                .offset(y: inset + (atBottom ? travel : 0))
                 .onAppear {
                     withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                        offset = h - 40
+                        atBottom = true
                     }
                 }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 20)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 

@@ -7,16 +7,18 @@ class ReceiptParser {
         var tax: Double?
         var total: Double?
         var tip: Double?
+        var fees: Double?
         var restaurantName: String?
+        var debugLog: [(line: String, verdict: String)] = []
     }
 
     private static let summaryPatterns: [(pattern: String, type: SummaryType)] = [
         ("sub.?total", .subtotal),
         ("sales.?tax", .tax),
         ("^tax", .tax),
-        ("hst", .tax),
-        ("gst", .tax),
-        ("vat", .tax),
+        ("\\bhst\\b", .tax),
+        ("\\bgst\\b", .tax),
+        ("\\bvat\\b", .tax),
         ("gratuity", .tip),
         ("^tip", .tip),
         ("service charge", .tip),
@@ -26,9 +28,20 @@ class ReceiptParser {
         ("^total", .total),
         ("^amt\\b", .total),
         ("^amount\\b", .total),
+        // Surcharges / flat fees split evenly among all diners
+        ("surcharge", .fees),
+        ("processing.?fee", .fees),
+        ("convenience.?fee", .fees),
+        ("credit.?card.?fee", .fees),
+        ("card.?fee", .fees),
+        ("admin.?fee", .fees),
+        ("administrative.?fee", .fees),
+        ("facility.?fee", .fees),
+        ("wellness.?fee", .fees),
+        ("healthcare.?surcharge", .fees),
     ]
 
-    private enum SummaryType { case subtotal, tax, tip, total }
+    private enum SummaryType { case subtotal, tax, tip, total, fees }
 
     private static let noisePatterns: [String] = [
         "cash", "credit", "debit", "visa", "mastercard", "amex",
@@ -36,7 +49,7 @@ class ReceiptParser {
         "thank you", "thanks", "please come", "have a nice",
         "server:", "check.?#", "guests?:", "table:",
         "receipt:", "invoice",
-        "tel", "phone:", "fax", "www\\.", "http", "\\.com",
+        "\\btel[.:\\s]", "phone:", "fax:", "www\\.", "http", "\\.com",
         "ref:", "auth", "status:",
         "invalid", "date",
         "^qty\\b", "^desc\\b", "^item\\b", "^price\\b",
@@ -49,35 +62,57 @@ class ReceiptParser {
         var tax: Double?
         var total: Double?
         var tip: Double?
+        var fees: Double?
+        var debugLog: [(line: String, verdict: String)] = []
 
-        for line in lines {
+        let paired = pairOrphanLines(lines)
+        let isNumberedList = detectsNumberedList(in: paired)
+
+        for line in paired {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             let lower = trimmed.lowercased()
 
-            guard !lower.isEmpty, lower.count > 1 else { continue }
-            guard !isNoise(lower) else { continue }
-
-            guard let price = extractPrice(from: trimmed) else { continue }
-
+            guard !lower.isEmpty, lower.count > 1 else {
+                debugLog.append((line: trimmed, verdict: "skip: empty"))
+                continue
+            }
+            guard !isNoise(lower) else {
+                debugLog.append((line: trimmed, verdict: "skip: NOISE"))
+                continue
+            }
+            guard let price = extractPrice(from: trimmed) else {
+                debugLog.append((line: trimmed, verdict: "skip: no price"))
+                continue
+            }
             if let summaryType = matchSummaryType(lower) {
                 switch summaryType {
                 case .subtotal: subtotal = price
-                case .tax: tax = price
-                case .tip: tip = price
-                case .total: total = price
+                case .tax:      tax = price
+                case .tip:      tip = price
+                case .total:    total = price
+                case .fees:     fees = (fees ?? 0) + price
                 }
+                debugLog.append((line: trimmed, verdict: "summary: \(summaryType)"))
                 continue
             }
-
             let name = cleanItemName(trimmed)
             if !name.isEmpty && name.count > 1 && price > 0 && price < 10000 {
-                let quantity = extractQuantity(from: trimmed)
+                let quantity = isNumberedList ? 1 : extractQuantity(from: trimmed)
                 items.append(ReceiptItem(name: name, price: price, quantity: quantity))
+                debugLog.append((line: trimmed, verdict: "ITEM: \(name) $\(price) qty\(quantity)"))
+            } else {
+                debugLog.append((line: trimmed, verdict: "skip: bad name '\(name)' or price \(price)"))
             }
         }
 
         if subtotal == nil && !items.isEmpty {
             subtotal = items.reduce(0) { $0 + $1.price }
+        }
+
+        // Most receipts include surcharges/fees in the subtotal line (they appear
+        // as line items above the subtotal). Back them out so fees aren't double-counted.
+        if let f = fees, let s = subtotal, f > 0 {
+            subtotal = max(0, s - f)
         }
 
         if tax == nil, let st = subtotal, let t = total, t > st {
@@ -86,7 +121,7 @@ class ReceiptParser {
 
         let restaurantName = extractRestaurantName(from: lines)
 
-        return ParsedReceipt(items: items, subtotal: subtotal, tax: tax, total: total, tip: tip, restaurantName: restaurantName)
+        return ParsedReceipt(items: items, subtotal: subtotal, tax: tax, total: total, tip: tip, fees: fees, restaurantName: restaurantName, debugLog: debugLog)
     }
 
     private static func extractPrice(from line: String) -> Double? {
@@ -105,6 +140,63 @@ class ReceiptParser {
             }
         }
         return nil
+    }
+
+    /// Merges consecutive line pairs where the first has text but no price and
+    /// the second has a price but no letters — a common OCR split for wide
+    /// two-column receipts where name and price land on slightly different baselines.
+    private static func pairOrphanLines(_ lines: [String]) -> [String] {
+        var result: [String] = []
+        var i = 0
+        while i < lines.count {
+            let line = lines[i]
+            let hasPrice   = extractPrice(from: line) != nil
+            let hasLetters = line.filter(\.isLetter).count > 0
+
+            if hasLetters && !hasPrice && i + 1 < lines.count {
+                let next           = lines[i + 1]
+                let nextHasPrice   = extractPrice(from: next) != nil
+                let nextHasLetters = next.filter(\.isLetter).count > 0
+                if nextHasPrice && !nextHasLetters {
+                    result.append(line + " " + next)
+                    i += 2
+                    continue
+                }
+            }
+            result.append(line)
+            i += 1
+        }
+        return result
+    }
+
+    /// Returns true when the item lines on this receipt use a sequential numbered
+    /// list format (01, 02, 03 … or 1, 2, 3 …), meaning leading numbers are
+    /// print-order bullets rather than item quantities.
+    private static func detectsNumberedList(in lines: [String]) -> Bool {
+        let leadingNumRegex = try? NSRegularExpression(pattern: #"^(\d{1,2})[\s\.]"#)
+        var sequence: [Int] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let lower = trimmed.lowercased()
+            guard !lower.isEmpty,
+                  !isNoise(lower),
+                  extractPrice(from: trimmed) != nil,
+                  matchSummaryType(lower) == nil else { continue }
+
+            if let regex = leadingNumRegex,
+               let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+               let range = Range(match.range(at: 1), in: trimmed),
+               let num = Int(trimmed[range]) {
+                sequence.append(num)
+            }
+        }
+
+        guard sequence.count >= 3 else { return false }
+        // Check consecutive: sorted list must equal [first, first+1, first+2, ...]
+        let sorted = sequence.sorted()
+        let expected = Array(sorted[0]..<(sorted[0] + sorted.count))
+        return sorted == expected && sorted[0] <= 2
     }
 
     private static func extractQuantity(from line: String) -> Int {
@@ -126,7 +218,10 @@ class ReceiptParser {
     private static func cleanItemName(_ line: String) -> String {
         var name = line
 
-        let removePatterns = [
+        // Always strip leading numbers from the name — whether they're bullets
+        // (numbered list) or quantities (e.g. "2 Cavatelli"). The quantity value
+        // is captured separately by extractQuantity before this is called.
+        let removePatterns: [String] = [
             #"\$\s*\d+\.\d{2}"#,
             #"\d+\.\d{2}"#,
             #"^\d+\s*[xX]\s+"#,

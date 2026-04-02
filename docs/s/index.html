@@ -318,6 +318,150 @@
     }
     .error-title { font-size: 18px; font-weight: 300; color: var(--text); }
     .error-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* ── Split picker overlay ── */
+    .split-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .split-overlay.active { display: flex; }
+    .split-sheet {
+      background: var(--bg-card);
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-width: 500px;
+      padding: 28px 22px 40px;
+    }
+    .split-sheet-title {
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .split-sheet-name {
+      font-size: 16px;
+      font-weight: 300;
+      font-family: 'Lora', Georgia, serif;
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .split-sheet-prompt {
+      font-size: 11px;
+      color: var(--accent2);
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .split-options {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .split-opt {
+      flex: 1;
+      padding: 14px;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 12px;
+      font-family: 'DM Mono', 'Courier New', monospace;
+      cursor: pointer;
+      text-align: center;
+    }
+    .split-opt.active {
+      background: #EDE3D4;
+      color: var(--obsidian);
+      border-color: transparent;
+    }
+    .split-default {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: 'DM Mono', 'Courier New', monospace;
+      cursor: pointer;
+      text-align: center;
+    }
+    .item-split-badge {
+      font-size: 10px;
+      color: var(--accent2);
+      margin-top: 2px;
+    }
+    .partial-tag {
+      display: inline-block;
+      font-size: 7px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent2);
+      border: 0.5px solid rgba(166,148,122,0.4);
+      border-radius: 4px;
+      padding: 2px 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+      font-family: 'DM Mono', 'Courier New', monospace;
+    }
+    .hint-text {
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      text-align: center;
+      padding: 16px 22px 0;
+    }
+    .split-custom-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex: 1;
+      padding: 14px;
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+    }
+    .split-custom-row span {
+      font-size: 12px;
+      font-family: 'DM Mono', 'Courier New', monospace;
+      color: var(--accent);
+    }
+    .split-custom-input {
+      width: 28px;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--accent2);
+      color: var(--text);
+      font-size: 12px;
+      font-family: 'DM Mono', 'Courier New', monospace;
+      text-align: center;
+      outline: none;
+      -webkit-appearance: none;
+      padding: 0;
+    }
+    .split-apply {
+      width: 100%;
+      padding: 14px;
+      background: #EDE3D4;
+      color: var(--obsidian);
+      border: none;
+      border-radius: 10px;
+      font-size: 11px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      font-family: 'DM Mono', 'Courier New', monospace;
+      cursor: pointer;
+      margin-top: 12px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -381,6 +525,18 @@
   </div>
 </div>
 
+<!-- Split picker overlay -->
+<div class="split-overlay" id="split-overlay">
+  <div class="split-sheet">
+    <div class="split-sheet-title">Split this item</div>
+    <div class="split-sheet-name" id="split-item-name"></div>
+    <div class="split-sheet-prompt">How many people are sharing?</div>
+    <div class="split-options" id="split-options"></div>
+    <button class="split-apply" id="split-apply-btn"></button>
+    <button class="split-default" id="split-default-btn">Even split (default)</button>
+  </div>
+</div>
+
 <!-- Firebase SDK (modular) -->
 <script type="module">
 import { initializeApp }   from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
@@ -412,6 +568,7 @@ const rawData   = params.get('d');
 let session   = null;
 let userName  = '';
 let selected  = new Set();
+let splitOverrides = {};  // idx -> denominator
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function escHtml(str) {
@@ -429,19 +586,31 @@ function b64UrlDecode(str) {
   try { return atob(str); } catch(e) { return null; }
 }
 
+function parseSplitOverridesStr(raw) {
+  if (!raw) return {};
+  const result = {};
+  raw.split(',').forEach(pair => {
+    const [k, v] = pair.split(':');
+    if (k && v) result[k] = parseInt(v) || 0;
+  });
+  return result;
+}
+
 function parseCompact(raw) {
   const text = b64UrlDecode(raw);
   if (!text) return null;
+  const isP4 = text.startsWith('p4');
   const isP3 = text.startsWith('p3');
   const isP2 = text.startsWith('p2');
-  if (!isP3 && !isP2) return null;
+  if (!isP4 && !isP3 && !isP2) return null;
 
   const lines = text.split('\n');
-  const minLines = isP3 ? 8 : 7;
+  const hasFees = isP4 || isP3;
+  const minLines = hasFees ? 8 : 7;
   if (lines.length < minLines) return null;
 
-  const fees = isP3 ? (parseFloat(lines[7]) || 0) : 0;
-  const itemStart = isP3 ? 8 : 7;
+  const fees = hasFees ? (parseFloat(lines[7]) || 0) : 0;
+  const itemStart = hasFees ? 8 : 7;
 
   const s = {
     restaurantName: lines[1],
@@ -462,9 +631,11 @@ function parseCompact(raw) {
     if (parts.length < 3) continue;
     const claimedBy = parts[3] ? parts[3].split(',').filter(Boolean) : [];
     const itemId = parts[4] || `item-${i - itemStart}`;
+    const splits = parts[5] ? parseSplitOverridesStr(parts[5]) : {};
     s.items.push({ id: itemId, name: parts[0],
                    price: parseFloat(parts[1]) || 0,
-                   quantity: parseInt(parts[2]) || 1, claimedBy });
+                   quantity: parseInt(parts[2]) || 1,
+                   claimedBy, splitOverrides: splits });
   }
   return s;
 }
@@ -487,7 +658,8 @@ function firestoreToSession(data) {
       name:      item.name || '',
       price:     item.price || 0,
       quantity:  item.quantity || 1,
-      claimedBy: item.claimedBy || []
+      claimedBy: item.claimedBy || [],
+      splitOverrides: item.splitOverrides || {}
     }))
   };
 }
@@ -515,13 +687,22 @@ async function writeClaims() {
       const i = claimed.indexOf(userName);
       if (i !== -1) claimed.splice(i, 1);
     }
-    return { id: item.id, name: item.name, price: item.price,
+    const splits = { ...(item.splitOverrides || {}) };
+    if (selected.has(idx) && splitOverrides[idx]) {
+      splits[userName] = splitOverrides[idx];
+    } else {
+      delete splits[userName];
+    }
+    const result = { id: item.id, name: item.name, price: item.price,
              quantity: item.quantity, claimedBy: claimed };
+    if (Object.keys(splits).length > 0) result.splitOverrides = splits;
+    return result;
   });
   await updateDoc(doc(db, 'sessions', sessionId), { items: updatedItems });
-  // Mirror locally for immediate summary calculation
   session.items = session.items.map((item, idx) => ({
-    ...item, claimedBy: updatedItems[idx].claimedBy
+    ...item,
+    claimedBy: updatedItems[idx].claimedBy,
+    splitOverrides: updatedItems[idx].splitOverrides || {}
   }));
 }
 
@@ -558,38 +739,73 @@ function renderClaim() {
   session.items.forEach((item, idx) => {
     const row = document.createElement('div');
     row.className = 'item-row' + (selected.has(idx) ? ' selected' : '');
-    row.addEventListener('click', () => toggleItem(idx, row));
+
+    let pressTimer = null;
+    row.addEventListener('pointerdown', () => {
+      pressTimer = setTimeout(() => { pressTimer = null; openSplitPicker(idx); }, 500);
+    });
+    row.addEventListener('pointerup', () => {
+      if (pressTimer !== null) { clearTimeout(pressTimer); toggleItem(idx, row); }
+    });
+    row.addEventListener('pointerleave', () => {
+      if (pressTimer !== null) clearTimeout(pressTimer);
+    });
 
     const others = item.claimedBy.filter(n => n !== userName);
     const claimedText = others.length ? `Also claimed by ${others.join(', ')}` : '';
+    const mySplit = splitOverrides[idx];
+    const hasAnySplit = mySplit || Object.keys(item.splitOverrides || {}).length > 0;
+    const partialTag = hasAnySplit ? '<span class="partial-tag">partial</span>' : '';
+    const splitBadge = (selected.has(idx) && mySplit)
+      ? `<div class="item-split-badge">Your share: 1/${mySplit}</div>` : '';
 
     row.innerHTML = `
       <div class="check"><div class="check-dot"></div></div>
       <div class="item-info">
-        <div class="item-name">${escHtml(item.name)}</div>
+        <div class="item-name">${escHtml(item.name)}${partialTag}</div>
         ${claimedText ? `<div class="item-claimed">${escHtml(claimedText)}</div>` : ''}
+        ${splitBadge}
       </div>
       <div class="item-price">$${item.price.toFixed(2)}</div>`;
     list.appendChild(row);
   });
+
+  let hint = document.getElementById('claim-hint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'claim-hint';
+    hint.className = 'hint-text';
+    hint.textContent = 'Tap & hold an item to split it';
+    list.parentNode.insertBefore(hint, list.nextSibling);
+  }
   updateTotal();
 }
 
 function toggleItem(idx, row) {
-  if (selected.has(idx)) { selected.delete(idx); row.classList.remove('selected'); }
-  else                   { selected.add(idx);    row.classList.add('selected'); }
+  if (selected.has(idx)) {
+    selected.delete(idx);
+    delete splitOverrides[idx];
+    row.classList.remove('selected');
+  } else {
+    selected.add(idx);
+    row.classList.add('selected');
+  }
   updateTotal();
-  writeClaims().catch(console.warn); // live sync on every tap
+  writeClaims().catch(console.warn);
+}
+
+function priceForPerson(item, idx) {
+  if (splitOverrides[idx]) return item.price / splitOverrides[idx];
+  const override = (item.splitOverrides || {})[userName];
+  if (override) return item.price / override;
+  const sharers = Math.max(1, item.claimedBy.length +
+    (item.claimedBy.includes(userName) ? 0 : 1));
+  return item.price / sharers;
 }
 
 function mySubtotal() {
   let sum = 0;
-  selected.forEach(idx => {
-    const item = session.items[idx];
-    const sharers = Math.max(1, item.claimedBy.length +
-      (item.claimedBy.includes(userName) ? 0 : 1));
-    sum += item.price / sharers;
-  });
+  selected.forEach(idx => { sum += priceForPerson(session.items[idx], idx); });
   return sum;
 }
 
@@ -620,12 +836,12 @@ async function showSummary() {
 
   selected.forEach(idx => {
     const item = session.items[idx];
-    const sharers = Math.max(1, item.claimedBy.length +
-      (item.claimedBy.includes(userName) ? 0 : 1));
-    const share = item.price / sharers;
+    const share = priceForPerson(item, idx);
+    const splitN = splitOverrides[idx] || (item.splitOverrides || {})[userName];
+    const splitLabel = splitN ? ` (1/${splitN})` : '';
     list.innerHTML += `
       <div class="breakdown-row">
-        <span class="breakdown-label">${escHtml(item.name)}</span>
+        <span class="breakdown-label">${escHtml(item.name)}${splitLabel}</span>
         <span class="breakdown-value">$${share.toFixed(2)}</span>
       </div>`;
   });
@@ -660,6 +876,81 @@ async function showSummary() {
   btn.textContent = 'Confirm My Items →';
   showScreen('screen-summary');
 }
+
+// ── Split picker ──────────────────────────────────────────────────────────────
+let splitPickerIdx = null;
+
+function openSplitPicker(idx) {
+  if (navigator.vibrate) navigator.vibrate(15);
+  splitPickerIdx = idx;
+  if (!selected.has(idx)) selected.add(idx);
+  const item = session.items[idx];
+  document.getElementById('split-item-name').textContent = item.name;
+
+  const optionsDiv = document.getElementById('split-options');
+  optionsDiv.innerHTML = '';
+  [2, 3, 4].forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'split-opt' + (splitOverrides[idx] === n ? ' active' : '');
+    btn.textContent = `1/${n}`;
+    btn.addEventListener('click', () => {
+      splitOverrides[idx] = n;
+      closeSplitPicker();
+      renderClaim();
+      writeClaims().catch(console.warn);
+    });
+    optionsDiv.appendChild(btn);
+  });
+
+  const customDiv = document.createElement('div');
+  customDiv.className = 'split-custom-row';
+  customDiv.innerHTML = '<span>1/</span><input type="number" class="split-custom-input" id="split-custom-input" min="2" placeholder="?">';
+  optionsDiv.appendChild(customDiv);
+
+  const applyBtn = document.getElementById('split-apply-btn');
+  applyBtn.style.display = 'none';
+  applyBtn.textContent = '';
+
+  const customInput = customDiv.querySelector('input');
+  customInput.addEventListener('input', () => {
+    const val = parseInt(customInput.value);
+    if (val >= 2) {
+      applyBtn.textContent = `Split 1/${val}`;
+      applyBtn.style.display = 'block';
+    } else {
+      applyBtn.style.display = 'none';
+    }
+  });
+
+  document.getElementById('split-overlay').classList.add('active');
+}
+
+document.getElementById('split-apply-btn').addEventListener('click', () => {
+  const input = document.getElementById('split-custom-input');
+  const val = parseInt(input?.value);
+  if (val >= 2 && splitPickerIdx !== null) {
+    splitOverrides[splitPickerIdx] = val;
+    closeSplitPicker();
+    renderClaim();
+    writeClaims().catch(console.warn);
+  }
+});
+
+function closeSplitPicker() {
+  document.getElementById('split-overlay').classList.remove('active');
+  splitPickerIdx = null;
+}
+
+document.getElementById('split-default-btn').addEventListener('click', () => {
+  if (splitPickerIdx !== null) delete splitOverrides[splitPickerIdx];
+  closeSplitPicker();
+  renderClaim();
+  writeClaims().catch(console.warn);
+});
+
+document.getElementById('split-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSplitPicker();
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 function init() {

@@ -1,11 +1,15 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct ShareSessionView: View {
-    let session: SplitSession
+    @State var session: SplitSession
     @Environment(\.dismiss) private var dismiss
     @State private var qrImage: UIImage?
     @State private var showCopied = false
     @State private var showQRFullscreen = false
+    @State private var listenerHandle: (any ListenerRegistration)?
+    @State private var showClaimView = false
+    @State private var hasUploaded = false
 
     var body: some View {
         ZStack {
@@ -104,27 +108,97 @@ struct ShareSessionView: View {
                         .padding(.horizontal, 22)
                         .padding(.bottom, 20)
 
-                        // Friend status
+                        // Live items section
                         VStack(spacing: 0) {
+                            Text("Items")
+                                .font(.system(size: 8, weight: .light))
+                                .tracking(2.5)
+                                .textCase(.uppercase)
+                                .foregroundColor(Color.theme.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.bottom, 8)
+
+                            ForEach(session.items) { item in
+                                HStack(spacing: 10) {
+                                    Circle()
+                                        .fill(item.claimedBy.isEmpty
+                                              ? Color.clear
+                                              : Color.theme.accentSecondary)
+                                        .overlay(
+                                            Circle().stroke(
+                                                item.claimedBy.isEmpty
+                                                    ? Color.theme.textSecondary
+                                                    : Color.theme.accentSecondary,
+                                                lineWidth: 1)
+                                        )
+                                        .frame(width: 7, height: 7)
+
+                                    Text(item.name)
+                                        .font(.system(size: 11, weight: .light))
+                                        .foregroundColor(Color.theme.accent)
+                                        .lineLimit(1)
+
+                                    Spacer()
+
+                                    if item.claimedBy.isEmpty {
+                                        Text("unclaimed")
+                                            .font(.system(size: 9, weight: .light))
+                                            .foregroundColor(Color.theme.textSecondary)
+                                    } else {
+                                        Text(item.claimedBy.joined(separator: ", "))
+                                            .font(.system(size: 9, weight: .light))
+                                            .foregroundColor(Color.theme.accentSecondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .padding(.vertical, 10)
+                                .overlay(alignment: .bottom) {
+                                    Rectangle().fill(Color.theme.rule).frame(height: 1)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 22)
+                        .padding(.bottom, 24)
+
+                        // People summary
+                        VStack(spacing: 0) {
+                            let claimants = session.allClaimants
+                            let hostClaimed = session.totalForPerson(session.hostName)
+                            let pendingParticipants = session.participants.filter {
+                                !claimants.contains($0) && $0 != session.hostName
+                            }
+
+                            // Host row always first
                             if !session.hostName.isEmpty {
                                 friendRow(
                                     initial: String(session.hostName.prefix(1)).uppercased(),
                                     name: session.hostName,
-                                    detail: "Organiser",
+                                    detail: hostClaimed > 0
+                                        ? String(format: "Your share: $%.2f", hostClaimed)
+                                        : "Tap \"Claim My Items\" to add your share",
                                     joined: true
                                 )
                             }
 
-                            let claimants = session.allClaimants
-                            if claimants.isEmpty {
-                                friendRow(initial: "—", name: "Waiting…", detail: "Not yet joined", joined: false)
+                            // Guest claimants
+                            let guests = claimants.filter { $0 != session.hostName }
+                            if guests.isEmpty && pendingParticipants.isEmpty {
+                                friendRow(initial: "—", name: "Waiting…", detail: "No guests yet", joined: false)
                             } else {
-                                ForEach(claimants, id: \.self) { name in
+                                ForEach(guests, id: \.self) { name in
                                     let amount = session.totalForPerson(name)
                                     friendRow(
                                         initial: String(name.prefix(1)).uppercased(),
                                         name: name,
-                                        detail: String(format: "Claimed $%.2f", amount),
+                                        detail: String(format: "Owes $%.2f", amount),
+                                        joined: true
+                                    )
+                                }
+                                ForEach(pendingParticipants, id: \.self) { name in
+                                    friendRow(
+                                        initial: String(name.prefix(1)).uppercased(),
+                                        name: name,
+                                        detail: "Choosing items…",
                                         joined: true
                                     )
                                 }
@@ -135,11 +209,8 @@ struct ShareSessionView: View {
                     }
                 }
 
-                // Send Venmo CTA
-                Button {
-                    openVenmoForAll()
-                } label: {
-                    Text("Send Venmo Requests")
+                Button { showClaimView = true } label: {
+                    Text("Claim My Items")
                         .font(.system(size: 11, weight: .light, design: .monospaced))
                         .tracking(2.5)
                         .textCase(.uppercase)
@@ -154,11 +225,38 @@ struct ShareSessionView: View {
             }
         }
         .navigationBarHidden(true)
+        .navigationDestination(isPresented: $showClaimView) {
+            ItemSelectionView(session: session, prefilledName: session.hostName, isHost: true)
+        }
         .onAppear {
             qrImage = QRCodeService.generateQRCode(from: session)
+            uploadAndListen()
+        }
+        .onDisappear {
+            listenerHandle?.remove()
+            listenerHandle = nil
         }
         .fullScreenCover(isPresented: $showQRFullscreen) {
             qrFullscreenView
+        }
+    }
+
+    // MARK: — Firestore
+
+    private func uploadAndListen() {
+        let sessionId = session.id.uuidString
+        // Only write the initial document once — re-appearance (e.g. after host
+        // claims their items and is returned here) must NOT overwrite Firestore,
+        // which would wipe the claims that were just written.
+        if !hasUploaded {
+            hasUploaded = true
+            Task {
+                try? await FirestoreService.shared.createSession(session)
+            }
+        }
+        listenerHandle?.remove()
+        listenerHandle = FirestoreService.shared.listen(to: sessionId) { updated in
+            session = updated
         }
     }
 
@@ -278,20 +376,4 @@ struct ShareSessionView: View {
         }
     }
 
-    private func openVenmoForAll() {
-        let note = session.restaurantName.isEmpty
-            ? "Dinner split via Parse"
-            : "\(session.restaurantName) - split via Parse"
-
-        var components = URLComponents(string: "venmo://paycharge")!
-        components.queryItems = [
-            URLQueryItem(name: "txn", value: "charge"),
-            URLQueryItem(name: "note", value: note),
-        ]
-        if let url = components.url, UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url)
-        } else if let webURL = URL(string: "https://venmo.com/") {
-            UIApplication.shared.open(webURL)
-        }
-    }
 }

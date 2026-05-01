@@ -1,66 +1,223 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parse - Split the bill</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #f7f7f9;
-            color: #1f1f24;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 400px;
-            text-align: center;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
-        }
-        .icon { font-size: 48px; margin-bottom: 16px; }
-        h1 {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-        .subtitle {
-            color: #73737a;
-            font-size: 15px;
-            margin-bottom: 24px;
-        }
-        .btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #f55940, #ff8c4d);
-            color: white;
-            padding: 14px 32px;
-            border-radius: 14px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 16px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parse – Split the Bill</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0B0907;
+      --bg-card:  #161210;
+      --accent:   #C9B99A;
+      --accent2:  #A6947A;
+      --text:     #EDE3D4;
+      --muted:    #6E5E4A;
+      --rule:     rgba(201,185,154,0.13);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ── */
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .mark svg { width: 22px; height: 22px; display: block; }
+    .wordmark {
+      font-size: 11px;
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      color: var(--text);
+      font-weight: 300;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 28px 60px;
+    }
+    .hero-eyebrow {
+      font-size: 9px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-family: 'DM Mono', monospace;
+    }
+    .hero-title {
+      font-family: 'Lora', Georgia, serif;
+      font-size: clamp(36px, 8vw, 60px);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .hero-sub {
+      font-size: 15px;
+      font-weight: 300;
+      color: var(--accent2);
+      letter-spacing: 0.5px;
+      margin-bottom: 48px;
+      font-family: 'DM Mono', monospace;
+    }
+    .hero-sub span {
+      color: var(--muted);
+      margin: 0 6px;
+    }
+
+    /* ── App Store button ── */
+    .btn-appstore {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--accent);
+      color: var(--bg);
+      padding: 15px 28px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: 'DM Mono', monospace;
+      transition: opacity 0.2s;
+    }
+    .btn-appstore:hover { opacity: 0.85; }
+    .btn-appstore svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    /* ── Feature strip ── */
+    .features {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      margin: 60px 0 0;
+    }
+    .feature {
+      flex: 1;
+      max-width: 220px;
+      padding: 32px 24px;
+      text-align: center;
+      border-right: 1px solid var(--rule);
+    }
+    .feature:last-child { border-right: none; }
+    .feature-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .feature-label {
+      font-family: 'Lora', Georgia, serif;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .feature-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-weight: 300;
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 28px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+    }
+    footer a {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      font-family: 'DM Mono', monospace;
+      transition: color 0.2s;
+    }
+    footer a:hover { color: var(--accent); }
+
+    @media (max-width: 600px) {
+      .features { flex-direction: column; align-items: center; }
+      .feature { border-right: none; border-bottom: 1px solid var(--rule); max-width: 100%; width: 100%; }
+      .feature:last-child { border-bottom: none; }
+    }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <div class="icon">🧾</div>
-        <h1>Parse</h1>
-        <p class="subtitle">Split the bill, not the friendship</p>
-        <p style="color: #73737a; font-size: 14px; margin-bottom: 24px;">
-            Scan. Claim. Venmo. Done.
-        </p>
-        <a href="https://apps.apple.com/us/app/parse-split-the-bill/id6760669292" class="btn">Get Parse on the App Store</a>
-        <p style="margin-top: 20px; font-size: 13px; color: #73737a;">
-            <a href="privacy.html" style="color: #f55940;">Privacy Policy</a>
-            &nbsp;·&nbsp;
-            <a href="mailto:aiden@amagarian.com" style="color: #f55940;">Support</a>
-        </p>
+
+  <nav>
+    <div class="mark">
+      <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="11" cy="11" r="10" stroke="#C9B99A" stroke-width="1.2"/>
+        <circle cx="11" cy="11" r="4" fill="#C9B99A" opacity="0.3"/>
+      </svg>
     </div>
+    <span class="wordmark">Parse</span>
+  </nav>
+
+  <div class="hero">
+    <p class="hero-eyebrow">Bill splitting, simplified</p>
+    <h1 class="hero-title">Split the bill,<br>not the friendship.</h1>
+    <p class="hero-sub">
+      Scan<span>·</span>Claim<span>·</span>Venmo<span>·</span>Done
+    </p>
+    <a href="https://apps.apple.com/us/app/parse-split-the-bill/id6760669292" class="btn-appstore">
+      <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+      </svg>
+      Download on the App Store
+    </a>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-num">01</div>
+        <div class="feature-label">Scan</div>
+        <div class="feature-desc">Photograph the receipt. Parse reads every item automatically.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">02</div>
+        <div class="feature-label">Claim</div>
+        <div class="feature-desc">Guests scan a QR code and tap what they ordered. Live, on any device.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-num">03</div>
+        <div class="feature-label">Venmo</div>
+        <div class="feature-desc">Each person gets a pre-filled Venmo link with their exact total.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="mailto:aiden@amagarian.com">Support</a>
+  </footer>
+
 </body>
 </html>
